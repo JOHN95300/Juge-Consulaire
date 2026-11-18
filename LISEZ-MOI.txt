@@ -1,0 +1,17 @@
+JUGE CONSULAIRE 1.1 — NOUVELLE PAGE D’ACCUEIL
+
+Avant la mise à jour, exporter une sauvegarde JSON.
+
+Déposer à la racine du dépôt GitHub les trois fichiers suivants :
+- index.html
+- sw.js
+- tribunal-accueil.jpg
+
+Conserver tous les autres fichiers existants (manifest.webmanifest, icon-512.png, etc.).
+Ne pas désinstaller l’application iPhone.
+
+À l’ouverture : illustration du tribunal et bouton Entrer.
+Après Entrer : application existante, onglets habituels.
+Le bouton Accueil de la barre inférieure ramène à l’illustration.
+
+Les données localStorage et les fonctions de sauvegarde restent inchangées.
