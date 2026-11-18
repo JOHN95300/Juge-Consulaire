@@ -25,6 +25,15 @@ body.welcome-mode #welcomeScreen{display:flex}
 .share-choices a,.share-choices button{display:flex;align-items:center;justify-content:center;text-align:center;min-height:48px;border-radius:11px;background:#e9f1fc;color:#163b75;border:1px solid #bed0e8;padding:9px;text-decoration:none;font:600 15px system-ui;cursor:pointer}
 .share-choices .share-close{grid-column:1/-1;background:#f1f2f5;color:#27354c}
 .share-choices .share-native{grid-column:1/-1;background:#1856a1;color:#fff}
+
+/* Notification de mise à jour PWA — indépendante des données locales */
+#appUpdateNotice[hidden]{display:none!important}
+#appUpdateNotice{position:fixed;z-index:20000;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto;background:#fff;color:#15283d;border:2px solid #2167b2;border-radius:16px;padding:16px;box-shadow:0 12px 35px #0005;font:15px/1.4 system-ui,-apple-system,sans-serif}
+#appUpdateNotice strong{display:block;margin-bottom:6px;font-size:17px}
+#appUpdateNotice p{margin:0 0 12px}
+#appUpdateNotice button{border:0;border-radius:9px;padding:10px 13px;font-weight:700;cursor:pointer}
+#appUpdateNow{background:#1765ae;color:white}
+#appUpdateLater{background:#e9eef4;color:#24364a;margin-left:7px}
 </style></head><body class="welcome-mode">
 <div id="welcomeScreen" aria-label="Page d’accueil de Juge Consulaire"><div class="welcome-frame"><img src="tribunal-accueil.jpg" alt="Tribunal lumineux sous un ciel bleu, drapeau français et balance de la justice dorée"></div><h1 class="welcome-title">JUGE CONSULAIRE</h1><p class="welcome-subtitle">Réviser • Comprendre • Mémoriser</p><button class="welcome-enter" type="button" onclick="enterApp()">Entrer</button><button class="share-open share-welcome" type="button" onclick="openShare()">↗ Partager l’application</button></div><header><h1>⚖ Juge Consulaire</h1><small>Réviser • Comprendre • Mémoriser</small></header><div id="toast" class="toast" role="status"></div><main>
 <section id="home" class="active"><button class="share-open" type="button" onclick="openShare()">↗ Partager l’application</button><div class="card"><h2>Bienvenue dans tes révisions juridiques</h2><p>Constitue ton propre répertoire de notions, d'articles et de décisions de justice.</p><div id="homeStats" class="stats"></div></div><div class="card"><h3>Accès rapide</h3><div class="actions"><button class="goldbtn" onclick="go('add')">＋ Ajouter</button><button class="primary" onclick="go('review')">↻ Réviser</button></div><button class="outline wide" style="margin-top:10px" onclick="go('glossary')">📖 Ouvrir le glossaire du juge consulaire</button></div><div class="card"><h3>Mes données</h3><p class="muted">Les fiches restent enregistrées sur cet appareil. Une sauvegarde JSON régulière est indispensable, notamment avant une mise à jour ou un changement de téléphone.</p><div class="actions"><button class="outline" onclick="exportJSON()">Exporter JSON</button><button class="outline" onclick="document.getElementById('importFile').click()">Importer JSON</button></div><input id="importFile" type="file" accept=".json,application/json" hidden onchange="importJSON(event)"></div></section>
@@ -82,4 +91,50 @@ function renderDashboard(){
 }
 function renderStats(){const count=db.entries.length,again=db.entries.filter(x=>x.again).length,smart=db.entries.filter(x=>!x.seen||x.due<=Date.now()).length;for(const id of ['homeStats','allStats']){const root=el(id);root.replaceChildren();for(const [num,label] of [[count,'Fiches'],[again,'À revoir'],[smart,'À réviser']]){const s=document.createElement('div');s.className='stat';s.append(textNode('b',num),textNode('small',label));root.append(s)}}const root=el('byCat');root.replaceChildren();for(const c of ['Mot','Article','Jurisprudence'])root.append(textNode('p',`${c} : ${db.entries.filter(x=>x.category===c).length} fiche(s)`));root.append(textNode('p',`Séances : ${db.sessions} • Je savais : ${db.correct} • À revoir : ${db.incorrect}`,'muted'));renderSmart();renderDashboard()}
 function exportJSON(){const blob=new Blob([JSON.stringify({app:'Juge Consulaire',version:1,exportedAt:new Date().toISOString(),data:db},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='juge-consulaire-sauvegarde-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}async function importJSON(ev){const file=ev.target.files?.[0];ev.target.value='';if(!file)return;try{const payload=JSON.parse(await file.text());if(payload.app!=='Juge Consulaire'||!payload.data||!Array.isArray(payload.data.entries))throw Error('Fichier non reconnu');const data=payload.data;if(!data.entries.every(x=>x&&typeof x.term==='string'&&typeof x.definition==='string'&&['Mot','Article','Jurisprudence'].includes(x.category)))throw Error('Fiches invalides');if(!confirm(`Restaurer ${data.entries.length} fiches ? Les données actuelles de Juge Consulaire seront remplacées.`))return;db={entries:data.entries,sessions:Number(data.sessions)||0,correct:Number(data.correct)||0,incorrect:Number(data.incorrect)||0,reviewHistory:Array.isArray(data.reviewHistory)?data.reviewHistory:[]};persist();renderStats();toast('Sauvegarde restaurée')}catch(e){alert('Import impossible : '+e.message)}}updateFields();renderStats();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
-</script></body></html>
+</script>
+<div id="appUpdateNotice" role="status" aria-live="polite" hidden><strong>🔄 Nouvelle version disponible !</strong><p>Une mise à jour de l’application est prête. Actualise-la pour profiter des nouveautés.</p><button type="button" id="appUpdateNow">Mettre à jour</button><button type="button" id="appUpdateLater">Plus tard</button></div>
+<script>
+/* Une mise à jour n'efface ni les fiches ni le vocabulaire enregistrés. */
+(function(){
+  if(!('serviceWorker' in navigator))return;
+  const notice=document.getElementById('appUpdateNotice');
+  const updateButton=document.getElementById('appUpdateNow');
+  const laterButton=document.getElementById('appUpdateLater');
+  let updateReady=false;
+  let dismissed=false;
+  let hadController=!!navigator.serviceWorker.controller;
+  function show(){if(hadController&&!dismissed){updateReady=true;notice.hidden=false;}}
+  function observe(reg){
+    if(!reg)return;
+    if(reg.waiting&&hadController)show();
+    reg.addEventListener('updatefound',()=>{
+      const worker=reg.installing;
+      if(worker)worker.addEventListener('statechange',()=>{
+        if(worker.state==='installed'&&navigator.serviceWorker.controller)show();
+      });
+    });
+  }
+  navigator.serviceWorker.ready.then(reg=>{
+    observe(reg);
+    reg.update().catch(()=>{});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{});});
+    window.addEventListener('pageshow',()=>{reg.update().catch(()=>{});});
+  }).catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(hadController)show();
+    hadController=true;
+  });
+  updateButton.addEventListener('click',()=>{
+    if(!updateReady)return;
+    updateButton.disabled=true;
+    updateButton.textContent='Actualisation…';
+    navigator.serviceWorker.ready.then(reg=>{
+      if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
+      /* La version de ces deux applications active automatiquement le nouveau SW. */
+      window.location.reload();
+    }).catch(()=>window.location.reload());
+  });
+  laterButton.addEventListener('click',()=>{dismissed=true;notice.hidden=true;});
+})();
+</script>
+</body></html>
